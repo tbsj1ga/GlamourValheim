@@ -10,5 +10,7 @@ The version is set in one place — `GlamourPlugin.Version` in `src/GlamourPlugi
   keep their stats; helmets, capes, belts and trinkets can be hidden.
 - The look is saved in the item and reaches other players through the game's own equipment
   sync: players without the mod see it, the server needs nothing.
-- In the inventory: `T` picks a look and puts it on, `Shift+T` resets, `Ctrl+T` hides; the
-  tooltip shows the look.
+- A Glamour window beside the inventory: your equipped items at the top, the looks they can
+  take below (own, hidden, every item of the kind you have found); one click puts a look on.
+  Built from the game's own inventory cells, buttons and font; draggable.
+- The item tooltip shows the look.

@@ -11,16 +11,16 @@ Version history is in `CHANGELOG.md`.
 
 ## How to use
 
-Open the inventory (a chest can be open too) and point at items:
+Open the inventory and press the **Glamour** button beside it. The window shows:
 
-| Key | Over an item |
-|---|---|
-| `T` | first press: pick this item's look; second press over another item of the same kind: put the look on it |
-| `T` over the picked item | drop the pick |
-| `Shift + T` | back to the item's own look |
-| `Ctrl + T` | hide / show a helmet, cape, belt or trinket |
+- **at the top, your equipped items** — helmet, chest, legs, cape, belt, trinket and what is in
+  your hands — each drawn in the look it wears; click one to choose it;
+- **below, the looks it can take**: *Own look*, *Hidden* (helmet, cape, belt, trinket), then
+  every item of the same kind you have found, by name. Click one and your character wears it
+  at once. The current look is framed.
 
-The item's tooltip says which look it wears. Putting an item's own look on it resets it too.
+Hover a cell for its name. The window can be dragged anywhere and remembers the spot; the item
+tooltip in the inventory says which look an item wears.
 
 - **The look belongs to the item.** It is saved in the item (`ItemData.m_customData`), so it
   stays after relogging, upgrading and repairing, and when the item goes into a chest or to
@@ -28,8 +28,9 @@ The item's tooltip says which look it wears. Putting an item's own look on it re
 - **Same kind only.** A chest piece takes the look of a chest piece, a cape of a cape. Weapons,
   shields, torches and tools also need the same grip (the same animations): a sword can look
   like an axe or a mace, not like a spear or a bow. Fishing rods keep their own look.
-- The look item only has to be at hand when you pick its look: from your inventory or from the
-  open chest. Afterwards you may store it, sell it or throw it away.
+- **Which looks.** By default the looks of items you have picked up at least once (the game
+  remembers them) or carry now — you do not need to keep the item. `Looks = All` offers every
+  item of the kind. Shields and capes with styles offer each style.
 
 ## How it works
 
@@ -42,6 +43,11 @@ While `SetupVisEquipment` runs for the local player, a prefix notes the equipped
 on the ten `VisEquipment` setters swap each hash (and the variant of shields and capes) for
 the look's, or for 0 to hide the slot. The swapped hash is what goes into the ZDO, so the
 look travels by the game's own sync. There is no RPC and no Jotunn version check.
+
+The window is built from the game's own parts: its cells are copies of the inventory grid's
+cell (frame, icon, selection frame, the game's tooltip), its buttons copies of the container's
+*Take all* button, its text in the game's font. It lives under the inventory's root, so it
+shows and hides with the inventory.
 
 **What players without the mod see.** Vanilla looks: exactly what you see. A look from another
 mod's item (Therzie, Southsil...): an empty slot for a player who lacks that mod, because their
@@ -90,9 +96,9 @@ once.
 | 01 General | `Enabled` | `true` | off: every item shows its own look (the looks stay saved) |
 | 01 General | `Weapons` | `true` | weapons, shields, torches and tools can take a look |
 | 01 General | `Tooltip` | `true` | the tooltip says which look the item wears |
-| 02 Keys | `LookKey` | `T` | pick a look / put it on |
-| 02 Keys | `ResetKey` | `T + LeftShift` | back to the item's own look |
-| 02 Keys | `HideKey` | `T + LeftControl` | hide / show a helmet, cape, belt or trinket |
+| 02 Panel | `Looks` | `Found` | `Found`: items you have picked up or carry; `All`: every item of the kind |
+| 02 Panel | `ButtonOffset` | `8, 0` | the button's offset from the inventory panel's top right corner |
+| 02 Panel | `PanelOffset` | `0, 0` | where the window opens; dragging the window sets it |
 
 ## Building
 

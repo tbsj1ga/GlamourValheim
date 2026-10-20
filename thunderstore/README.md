@@ -10,19 +10,17 @@ check: install it if you want it; your friends, the host and a dedicated server 
 
 ## How to use
 
-Open the inventory (a chest can be open too) and point at items:
-
-- `T` — pick an item's look; `T` again over another item of the same kind puts the look on it.
-- `Shift + T` — back to the item's own look.
-- `Ctrl + T` — hide / show a helmet, cape, belt or trinket.
-
-The tooltip shows which look an item wears.
+Open the inventory and press **Glamour** beside it. At the top of the window are your equipped
+items, each in the look it wears; pick one, then click any look below — *Own look*, *Hidden*
+(helmet, cape, belt, trinket) or any item of the same kind you have found. Your character
+wears it at once. Drag the window wherever you like; it remembers the spot.
 
 - The look is saved in the item: it stays after relogging, upgrades and repairs, in chests and
   when you give the item away.
 - Same kind only: chest for chest, cape for cape. Weapons, shields, torches and tools also need
   the same grip, so the animations fit (a sword can look like an axe, not like a spear).
-- The look item is only needed when you pick its look — afterwards it can go.
+- Looks of every item you have ever picked up — no need to keep the item. Or every item in the
+  game with `Looks = All`.
 - A look from another mod's item shows as an empty slot to players who lack that mod; vanilla
   looks are seen by everyone.
 - Do not run it together with another transmog mod.
@@ -34,4 +32,5 @@ The tooltip shows which look an item wears.
 - `Enabled` — on / off (the looks stay saved).
 - `Weapons` — looks for weapons, shields, torches and tools.
 - `Tooltip` — the look line in the tooltip.
-- `LookKey`, `ResetKey`, `HideKey` — the keys.
+- `Looks` — `Found` (items you have picked up) or `All`.
+- `ButtonOffset`, `PanelOffset` — where the button and the window sit.

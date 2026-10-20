@@ -9,8 +9,9 @@ using UnityEngine;
 namespace Glamour
 {
     // Transmog: any of your items can look like another item of the same kind, keeping its own
-    // stats. The look is chosen per item and saved in the item (ItemData.m_customData), so it
-    // survives relogging, upgrading and repairing, and stays when the item changes hands.
+    // stats. The look is chosen per item in a panel next to the inventory and saved in the item
+    // (ItemData.m_customData), so it survives relogging, upgrading and repairing, and stays when
+    // the item changes hands.
     //
     // How the look reaches other players: Humanoid.SetupVisEquipment hands VisEquipment the hash
     // of every equipped item's prefab (SetChestItem(hash), SetLeftItem(hash, variant, ...) ...).
@@ -22,7 +23,7 @@ namespace Glamour
     // A look that is not in a viewer's game (an item from a mod they do not have) shows as an
     // empty slot to them; vanilla looks are seen by everyone.
     [BepInPlugin(Guid, Name, Version)]
-    public class GlamourPlugin : BaseUnityPlugin
+    public partial class GlamourPlugin : BaseUnityPlugin
     {
         public const string Guid = "j1ga.glamour";
         public const string Name = "Glamour";
@@ -37,21 +38,12 @@ namespace Glamour
         private static ConfigEntry<bool> _enabled;
         private static ConfigEntry<bool> _weapons;
         private static ConfigEntry<bool> _tooltip;
-        private static ConfigEntry<KeyboardShortcut> _lookKey;
-        private static ConfigEntry<KeyboardShortcut> _resetKey;
-        private static ConfigEntry<KeyboardShortcut> _hideKey;
-
-        // The look picked with the look key, waiting to be put on another item.
-        private static ItemDrop.ItemData _picked;
 
         // The equipment of the local player while its SetupVisEquipment runs; null otherwise.
         private static Outfit _dressing;
 
         private static readonly FieldInfo _visEquipmentField = AccessTools.Field(typeof(Humanoid), "m_visEquipment");
         private static readonly MethodInfo _setupVisEquipment = AccessTools.Method(typeof(Humanoid), "SetupVisEquipment");
-        private static readonly FieldInfo _containerGridField = AccessTools.Field(typeof(InventoryGui), "m_containerGrid");
-        private static readonly MethodInfo _hoveredElement = AccessTools.Method(typeof(InventoryGrid), "GetHoveredElement");
-        private static readonly MethodInfo _elementPos = AccessTools.Method(typeof(InventoryGrid), "GetElementPos");
 
         private readonly HashSet<string> _loggedErrors = new HashSet<string>();
         private Harmony _harmony;
@@ -69,14 +61,9 @@ namespace Glamour
             _weapons = Config.Bind("01 General", "Weapons", true,
                 "Weapons, shields, torches and tools can take a look too (of the same kind and grip only).");
             _tooltip = Config.Bind("01 General", "Tooltip", true, "The item tooltip says which look the item wears.");
-            _lookKey = Config.Bind("02 Keys", "LookKey", new KeyboardShortcut(KeyCode.T),
-                "In the inventory, over an item: the first press picks its look, the second press over another item of the same kind puts the look on it.");
-            _resetKey = Config.Bind("02 Keys", "ResetKey", new KeyboardShortcut(KeyCode.T, KeyCode.LeftShift),
-                "In the inventory, over an item: back to its own look.");
-            _hideKey = Config.Bind("02 Keys", "HideKey", new KeyboardShortcut(KeyCode.T, KeyCode.LeftControl),
-                "In the inventory, over a helmet, cape, belt or trinket: hide it / show it again.");
             _enabled.SettingChanged += delegate { Refresh(); };
             _weapons.SettingChanged += delegate { Refresh(); };
+            BindUiConfig();
 
             _harmony = new Harmony(Guid);
             _harmony.PatchAll(typeof(GlamourPlugin).Assembly);
@@ -86,22 +73,14 @@ namespace Glamour
         private void OnDestroy()
         {
             if (_harmony != null) _harmony.UnpatchSelf();
+            DestroyUi();
         }
 
         private void Update()
         {
             try
             {
-                if (!InventoryGui.IsVisible() || Player.m_localPlayer == null)
-                {
-                    _picked = null;
-                    return;
-                }
-                if (TypingSomewhere()) return;
-
-                if (ShortcutPressed(_hideKey.Value)) OnHideKey(HoveredItem());
-                else if (ShortcutPressed(_resetKey.Value)) OnResetKey(HoveredItem());
-                else if (ShortcutPressed(_lookKey.Value)) OnLookKey(HoveredItem());
+                UpdateUi();
             }
             catch (Exception e)
             {
@@ -110,158 +89,24 @@ namespace Glamour
         }
 
         // ------------------------------------------------------------------
-        // The keys
+        // What can look like what
         // ------------------------------------------------------------------
-        private static void OnLookKey(ItemDrop.ItemData item)
-        {
-            if (item == null) return;
-            if (_picked == null)
-            {
-                if (!HasLookSlot(item.m_shared.m_itemType) || item.m_dropPrefab == null)
-                {
-                    Message(ItemName(item) + " has no look to take.");
-                    return;
-                }
-                if (IsHand(item.m_shared.m_itemType) && !_weapons.Value)
-                {
-                    Message("Looks for weapons are off (Weapons in the config).");
-                    return;
-                }
-                _picked = item;
-                Message("Look of " + ItemName(item) + " picked. Press " + _lookKey.Value + " over an item of the same kind to put it on.");
-                return;
-            }
 
-            ItemDrop.ItemData look = _picked;
-            if (ReferenceEquals(item, look))
-            {
-                _picked = null;
-                Message("Look dropped.");
-                return;
-            }
-            string why = WhyNot(item, look);
-            if (why != null)
-            {
-                Message(why);
-                return;
-            }
-            _picked = null;
-            if (look.m_dropPrefab.name == item.m_dropPrefab.name && look.m_variant == item.m_variant)
-            {
-                SetLook(item, null);
-                Message(ItemName(item) + " wears its own look.");
-            }
-            else
-            {
-                string value = look.m_dropPrefab.name;
-                if (look.m_shared.m_variants > 1) value += "|" + look.m_variant;
-                SetLook(item, value);
-                Message(ItemName(item) + " now looks like " + ItemName(look) + ".");
-            }
-        }
-
-        private static void OnResetKey(ItemDrop.ItemData item)
+        // Why item cannot take the look of an item with the shared data look, or null when it can.
+        private static string WhyNot(ItemDrop.ItemData item, ItemDrop.ItemData.SharedData look)
         {
-            _picked = null;
-            if (item == null) return;
-            if (GetLook(item) == null)
-            {
-                Message(ItemName(item) + " already wears its own look.");
-                return;
-            }
-            SetLook(item, null);
-            Message(ItemName(item) + " wears its own look.");
-        }
-
-        private static void OnHideKey(ItemDrop.ItemData item)
-        {
-            _picked = null;
-            if (item == null) return;
-            if (!CanHide(item.m_shared.m_itemType))
-            {
-                Message("Only a helmet, cape, belt or trinket can be hidden.");
-                return;
-            }
-            if (GetLook(item) == HiddenValue)
-            {
-                SetLook(item, null);
-                Message(ItemName(item) + " is shown again.");
-            }
-            else
-            {
-                SetLook(item, HiddenValue);
-                Message(ItemName(item) + " is hidden.");
-            }
-        }
-
-        // Why item cannot take look's appearance, or null when it can.
-        private static string WhyNot(ItemDrop.ItemData item, ItemDrop.ItemData look)
-        {
-            ItemDrop.ItemData.SharedData a = item.m_shared, b = look.m_shared;
-            if (!HasLookSlot(a.m_itemType) || item.m_dropPrefab == null) return ItemName(item) + " cannot take a look.";
-            if (a.m_itemType != b.m_itemType) return ItemName(item) + " and " + ItemName(look) + " are different kinds of items.";
+            ItemDrop.ItemData.SharedData a = item.m_shared;
+            if (!HasLookSlot(a.m_itemType) || item.m_dropPrefab == null) return "cannot take a look";
+            if (a.m_itemType != look.m_itemType) return "a different kind of item";
             if (IsHand(a.m_itemType))
             {
-                if (!_weapons.Value) return "Looks for weapons are off (Weapons in the config).";
+                if (!_weapons.Value) return "looks for weapons are off (Weapons in the config)";
                 // The grip decides the animations; the look of another grip would be held wrong.
-                if (a.m_animationState != b.m_animationState) return ItemName(item) + " and " + ItemName(look) + " are held differently.";
+                if (a.m_animationState != look.m_animationState) return "held differently";
                 // The fishing line is tied to the rod's own model.
-                if (a.m_animationState == ItemDrop.ItemData.AnimationState.FishingRod) return "Fishing rods keep their own look.";
+                if (a.m_animationState == ItemDrop.ItemData.AnimationState.FishingRod) return "fishing rods keep their own look";
             }
             return null;
-        }
-
-        // ------------------------------------------------------------------
-        // The look stored in the item
-        // ------------------------------------------------------------------
-        private static string GetLook(ItemDrop.ItemData item)
-        {
-            if (item == null || item.m_customData == null) return null;
-            string value;
-            return item.m_customData.TryGetValue(DataKey, out value) && !string.IsNullOrEmpty(value) ? value : null;
-        }
-
-        private static void SetLook(ItemDrop.ItemData item, string value)
-        {
-            if (item.m_customData == null) item.m_customData = new Dictionary<string, string>();
-            if (value == null) item.m_customData.Remove(DataKey);
-            else item.m_customData[DataKey] = value;
-            if (item.m_equipped) Refresh();
-        }
-
-        private static void ParseLook(string value, out string prefab, out int variant)
-        {
-            variant = -1;
-            int bar = value.IndexOf('|');
-            if (bar < 0)
-            {
-                prefab = value;
-                return;
-            }
-            prefab = value.Substring(0, bar);
-            int v;
-            if (int.TryParse(value.Substring(bar + 1), out v)) variant = v;
-        }
-
-        // The look of an equipped item as VisEquipment takes it. False: show the item itself.
-        private static bool Resolve(ItemDrop.ItemData item, out string prefab, out int variant)
-        {
-            prefab = null;
-            variant = -1;
-            string value = GetLook(item);
-            if (value == null) return false;
-            ItemDrop.ItemData.ItemType type = item.m_shared.m_itemType;
-            if (IsHand(type) && !_weapons.Value) return false;
-            if (value == HiddenValue)
-            {
-                if (!CanHide(type)) return false;
-                prefab = "";
-                return true;
-            }
-            ParseLook(value, out prefab, out variant);
-            // A look whose item is gone (its mod removed): the item's own look.
-            if (ObjectDB.instance == null || ObjectDB.instance.GetItemPrefab(prefab) == null) return false;
-            return true;
         }
 
         private static bool HasLookSlot(ItemDrop.ItemData.ItemType type)
@@ -304,6 +149,80 @@ namespace Glamour
         }
 
         // ------------------------------------------------------------------
+        // The look stored in the item
+        // ------------------------------------------------------------------
+        private static string GetLook(ItemDrop.ItemData item)
+        {
+            if (item == null || item.m_customData == null) return null;
+            string value;
+            return item.m_customData.TryGetValue(DataKey, out value) && !string.IsNullOrEmpty(value) ? value : null;
+        }
+
+        private static void SetLook(ItemDrop.ItemData item, string value)
+        {
+            if (item.m_customData == null) item.m_customData = new Dictionary<string, string>();
+            if (value == null) item.m_customData.Remove(DataKey);
+            else item.m_customData[DataKey] = value;
+            if (item.m_equipped) Refresh();
+        }
+
+        private static string LookValue(string prefab, int variant)
+        {
+            return variant >= 0 ? prefab + "|" + variant : prefab;
+        }
+
+        private static void ParseLook(string value, out string prefab, out int variant)
+        {
+            variant = -1;
+            int bar = value.IndexOf('|');
+            if (bar < 0)
+            {
+                prefab = value;
+                return;
+            }
+            prefab = value.Substring(0, bar);
+            int v;
+            if (int.TryParse(value.Substring(bar + 1), out v)) variant = v;
+        }
+
+        // The look of an equipped item as VisEquipment takes it. False: show the item itself.
+        private static bool Resolve(ItemDrop.ItemData item, out string prefab, out int variant)
+        {
+            prefab = null;
+            variant = -1;
+            string value = GetLook(item);
+            if (value == null) return false;
+            ItemDrop.ItemData.ItemType type = item.m_shared.m_itemType;
+            if (IsHand(type) && !_weapons.Value) return false;
+            if (value == HiddenValue)
+            {
+                if (!CanHide(type)) return false;
+                prefab = "";
+                return true;
+            }
+            ParseLook(value, out prefab, out variant);
+            // A look whose item is gone (its mod removed): the item's own look.
+            if (ObjectDB.instance == null || ObjectDB.instance.GetItemPrefab(prefab) == null) return false;
+            return true;
+        }
+
+        // The display name of a stored look; null for none.
+        private static string LookName(string value)
+        {
+            if (value == null) return null;
+            if (value == HiddenValue) return "hidden";
+            string prefab;
+            int variant;
+            ParseLook(value, out prefab, out variant);
+            GameObject go = ObjectDB.instance != null ? ObjectDB.instance.GetItemPrefab(prefab) : null;
+            ItemDrop drop = go != null ? go.GetComponent<ItemDrop>() : null;
+            if (drop == null) return prefab + " (missing)";
+            string name = Localize(drop.m_itemData.m_shared.m_name);
+            if (variant >= 0 && drop.m_itemData.m_shared.m_variants > 1) name += " (style " + (variant + 1) + ")";
+            return name;
+        }
+
+        // ------------------------------------------------------------------
         // Helpers
         // ------------------------------------------------------------------
 
@@ -325,57 +244,14 @@ namespace Glamour
             }
         }
 
-        // The item under the mouse in the inventory or the open chest, as the game's own
-        // "equip the hovered item" finds it.
-        private static ItemDrop.ItemData HoveredItem()
+        private static string Localize(string text)
         {
-            InventoryGui gui = InventoryGui.instance;
-            if (gui == null) return null;
-            ItemDrop.ItemData item = HoveredItem(gui.m_playerGrid);
-            if (item == null && _containerGridField != null) item = HoveredItem(_containerGridField.GetValue(gui) as InventoryGrid);
-            return item;
-        }
-
-        private static ItemDrop.ItemData HoveredItem(InventoryGrid grid)
-        {
-            if (grid == null || !grid.isActiveAndEnabled || _hoveredElement == null || _elementPos == null) return null;
-            object element = _hoveredElement.Invoke(grid, null);
-            if (element == null) return null;
-            Vector2i pos = (Vector2i)_elementPos.Invoke(grid, new object[] { element });
-            Inventory inventory = grid.GetInventory();
-            return inventory != null ? inventory.GetItemAt(pos.x, pos.y) : null;
+            return Localization.instance != null ? Localization.instance.Localize(text) : text;
         }
 
         private static string ItemName(ItemDrop.ItemData item)
         {
-            string name = item.m_shared.m_name;
-            return Localization.instance != null ? Localization.instance.Localize(name) : name;
-        }
-
-        private static void Message(string text)
-        {
-            if (Player.m_localPlayer != null) Player.m_localPlayer.Message(MessageHud.MessageType.Center, text, 0, null);
-        }
-
-        // The key with its modifiers held, whatever else is held. KeyboardShortcut.IsDown() also
-        // demands that NO other key is down, so it would not fire while running.
-        private static bool ShortcutPressed(KeyboardShortcut shortcut)
-        {
-            if (shortcut.MainKey == KeyCode.None) return false;
-            BepInEx.IInputSystem input = UnityInput.Current;
-            if (input == null || !input.GetKeyDown(shortcut.MainKey)) return false;
-            foreach (KeyCode modifier in shortcut.Modifiers)
-                if (!input.GetKey(modifier)) return false;
-            return true;
-        }
-
-        // Chat, the console or a text dialog has the keyboard: the key is a letter being typed.
-        private static bool TypingSomewhere()
-        {
-            if (Chat.instance != null && Chat.instance.HasFocus()) return true;
-            if (global::Console.IsVisible()) return true;
-            if (TextInput.IsVisible()) return true;
-            return false;
+            return Localize(item.m_shared.m_name);
         }
 
         private void Fail(string where, Exception e)
@@ -557,21 +433,10 @@ namespace Glamour
             private static void Postfix(ItemDrop.ItemData item, ref string __result)
             {
                 if (!_tooltip.Value || item == null) return;
-                string value = GetLook(item);
-                if (value == null) return;
-                string text;
-                if (value == HiddenValue) text = "hidden";
-                else
-                {
-                    string prefab;
-                    int variant;
-                    ParseLook(value, out prefab, out variant);
-                    GameObject go = ObjectDB.instance != null ? ObjectDB.instance.GetItemPrefab(prefab) : null;
-                    ItemDrop drop = go != null ? go.GetComponent<ItemDrop>() : null;
-                    text = drop != null ? Localization.instance.Localize(drop.m_itemData.m_shared.m_name) : prefab + " (missing)";
-                }
+                string name = LookName(GetLook(item));
+                if (name == null) return;
                 string state = _enabled.Value ? "" : " (Glamour is off)";
-                __result += "\n\n<color=#C9A0FF>Look: " + text + state + "</color>";
+                __result += "\n\n<color=#C9A0FF>Look: " + name + state + "</color>";
             }
         }
     }
