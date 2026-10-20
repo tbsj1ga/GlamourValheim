@@ -1,0 +1,9 @@
+{
+  "name": "Glamour",
+  "version_number": "0.0.0",
+  "website_url": "https://github.com/tbsj1ga/GlamourValheim",
+  "description": "Transmog: make your armor, weapons and shields look like other items, keep their stats. Players without the mod see your look too.",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2350"
+  ]
+}
