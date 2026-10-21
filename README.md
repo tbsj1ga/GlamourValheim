@@ -59,6 +59,10 @@ to the item's own look; the look stays saved.
 
 ## Compatibility
 
+- **HudLayout**: the button and the window register through its API (by reflection, HudLayout
+  stays optional) as *Glamour button* and *Glamour window*. Open the inventory and the window,
+  then HudLayout's editor, to move, scale or fade them.
+
 Built against **Valheim 1.0.20** (network version 41), **BepInEx 5.4.23.5**
 (BepInExPack_Valheim 5.4.2351). Do not run it together with another transmog mod (Alpus
 Transmog and the like): both swap the same calls. Alpus Transmog also demands that everyone
@@ -99,6 +103,7 @@ once.
 | 02 Panel | `Looks` | `Found` | `Found`: items you have picked up or carry; `All`: every item of the kind |
 | 02 Panel | `ButtonOffset` | `8, 0` | the button's offset from the inventory panel's top right corner |
 | 02 Panel | `PanelOffset` | `0, 0` | where the window opens; dragging the window sets it |
+| 02 Panel | `ApplyToAllOfKind` | `false` | on: a look chosen for an item goes onto every item of the same kind you carry (same slot; held items also the same grip) — own look and *Hidden* too |
 
 ## Building
 

@@ -14,3 +14,5 @@ The version is set in one place — `GlamourPlugin.Version` in `src/GlamourPlugi
   take below (own, hidden, every item of the kind you have found); one click puts a look on.
   Built from the game's own inventory cells, buttons and font; draggable.
 - The item tooltip shows the look.
+- `ApplyToAllOfKind` (off by default): one click dresses every item of the kind you carry.
+- The button and the window can be moved, scaled and faded in HudLayout's editor.

@@ -34,3 +34,6 @@ wears it at once. Drag the window wherever you like; it remembers the spot.
 - `Tooltip` — the look line in the tooltip.
 - `Looks` — `Found` (items you have picked up) or `All`.
 - `ButtonOffset`, `PanelOffset` — where the button and the window sit.
+- `ApplyToAllOfKind` (off by default) — a look goes onto every item of the same kind you carry.
+
+Works with HudLayout: the button and the window can be moved in its editor.

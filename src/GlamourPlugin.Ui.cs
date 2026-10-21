@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using BepInEx.Configuration;
 using TMPro;
 using UnityEngine;
@@ -29,6 +30,7 @@ namespace Glamour
         private static ConfigEntry<LookSource> _cfgLooks;
         private static ConfigEntry<Vector2> _cfgButtonOffset;
         private static ConfigEntry<Vector2> _cfgPanelOffset;
+        private static ConfigEntry<bool> _cfgAllOfKind;
 
         private const int GridColumns = 8;
         private const int GridRows = 4;
@@ -71,7 +73,10 @@ namespace Glamour
                 "Where the Glamour button sits: offset from the top right corner of the inventory panel.");
             _cfgPanelOffset = Config.Bind("02 Panel", "PanelOffset", new Vector2(0f, 0f),
                 "Where the window opens, relative to its place beside the inventory. Dragging the window sets it.");
+            _cfgAllOfKind = Config.Bind("02 Panel", "ApplyToAllOfKind", false,
+                "On: a look chosen for an item goes onto every item of the same kind you carry (the same slot; weapons, shields, torches and tools also the same grip). Own look and Hidden too.");
             _cfgLooks.SettingChanged += delegate { if (_instance != null) _instance.RebuildLooks(); };
+            _cfgAllOfKind.SettingChanged += delegate { if (_instance != null) _instance.RebuildLooks(); };
             _cfgButtonOffset.SettingChanged += delegate { if (_instance != null && _instance._button != null) _instance._button.anchoredPosition = _cfgButtonOffset.Value; };
         }
 
@@ -206,9 +211,10 @@ namespace Glamour
 
             string current = GetLook(item);
             _infoText.text = "<b>" + ItemName(item) + "</b>   " + (current != null ? "looks like " + LookName(current) : "own look");
-            _hintText.text = _cfgLooks.Value == LookSource.All
+            _hintText.text = (_cfgLooks.Value == LookSource.All
                 ? "All items of this kind. Stats stay the item's own."
-                : "Looks of items you have found. Stats stay the item's own.";
+                : "Looks of items you have found. Stats stay the item's own.")
+                + (_cfgAllOfKind.Value ? " A click dresses every item of this kind you carry." : "");
 
             List<LookEntry> entries = Looks(item);
             for (int i = 0; i < entries.Count; i++)
@@ -224,12 +230,34 @@ namespace Glamour
                 ItemDrop.ItemData target = item;
                 cell.m_button.onClick.AddListener(delegate
                 {
-                    SetLook(target, captured.Value);
+                    PutOn(target, captured.Value);
                     RebuildSlots();
                     RebuildLooks();
                 });
             }
             SetGridHeight((entries.Count + GridColumns - 1) / GridColumns);
+        }
+
+        // The look onto the item - or, with ApplyToAllOfKind, onto every item of its kind in the
+        // inventory. An item whose own look it is goes back to its own look.
+        private static void PutOn(ItemDrop.ItemData item, string value)
+        {
+            Player player = Player.m_localPlayer;
+            Inventory inventory = player != null ? player.GetInventory() : null;
+            if (!_cfgAllOfKind.Value || inventory == null)
+            {
+                SetLook(item, value);
+                return;
+            }
+            bool refresh = false;
+            foreach (ItemDrop.ItemData other in inventory.GetAllItems())
+            {
+                if (!ReferenceEquals(other, item) && !SameKind(other, item)) continue;
+                string v = value != null && value != HiddenValue && value == OwnValue(other) ? null : value;
+                if (StoreLook(other, v)) refresh = true;
+            }
+            if (!inventory.ContainsItem(item) && StoreLook(item, value)) refresh = true;
+            if (refresh) Refresh();
         }
 
         // Own look, hidden (where allowed), then every look of the same kind, by name.
@@ -385,6 +413,8 @@ namespace Glamour
             _hintText = MakeText(_panel, "Hint", sample, 14f, new Vector2(Pad, y - 2f), new Vector2(width - 2f * Pad, hintH));
             _hintText.alignment = TextAlignmentOptions.Left;
             _hintText.color = new Color(0.8f, 0.8f, 0.76f);
+
+            RegisterWithHudLayout(_button, _panel);
 
             panelGo.SetActive(false);
             if (_panelOpen)
@@ -574,6 +604,39 @@ namespace Glamour
             if (b != null) { b.enabled = on; return; }
             Component c = o as Component;
             if (c != null) c.gameObject.SetActive(on);
+        }
+
+        // HudLayout, when installed, moves, scales and hides the button and the window like its
+        // own elements (open the inventory and the window, then its editor). Through reflection,
+        // so HudLayout stays optional; registered again for every new InventoryGui (same ids, the
+        // settings stay).
+        private static void RegisterWithHudLayout(RectTransform button, RectTransform window)
+        {
+            try
+            {
+                Type api = Type.GetType("HudLayout.HudLayoutApi, HudLayout");
+                if (api == null) return;
+                // Register(string id, RectTransform target, string displayName); found by walking the
+                // methods, as check-refs.ps1 takes a GetMethod by name for a game member
+                MethodInfo register = null;
+                foreach (MethodInfo m in api.GetMethods(BindingFlags.Public | BindingFlags.Static))
+                {
+                    if (m.Name != "Register") continue;
+                    ParameterInfo[] p = m.GetParameters();
+                    if (p.Length == 3 && p[0].ParameterType == typeof(string) && p[1].ParameterType == typeof(RectTransform) && p[2].ParameterType == typeof(string))
+                    {
+                        register = m;
+                        break;
+                    }
+                }
+                if (register == null) return;
+                if (button != null) register.Invoke(null, new object[] { "Glamour.Button", button, "Glamour button" });
+                if (window != null) register.Invoke(null, new object[] { "Glamour.Window", window, "Glamour window" });
+            }
+            catch (Exception e)
+            {
+                if (_instance != null) _instance.Fail("HudLayout", e);
+            }
         }
 
         private void SavePanelOffset(Vector2 delta)

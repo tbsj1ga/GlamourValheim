@@ -160,10 +160,34 @@ namespace Glamour
 
         private static void SetLook(ItemDrop.ItemData item, string value)
         {
+            if (StoreLook(item, value)) Refresh();
+        }
+
+        // Writes the look into the item; true when the item is worn (the model must follow).
+        private static bool StoreLook(ItemDrop.ItemData item, string value)
+        {
             if (item.m_customData == null) item.m_customData = new Dictionary<string, string>();
             if (value == null) item.m_customData.Remove(DataKey);
             else item.m_customData[DataKey] = value;
-            if (item.m_equipped) Refresh();
+            return item.m_equipped;
+        }
+
+        // The item's own look as a stored value would name it.
+        private static string OwnValue(ItemDrop.ItemData item)
+        {
+            if (item.m_dropPrefab == null) return null;
+            return LookValue(item.m_dropPrefab.name, item.m_shared.m_variants > 1 ? item.m_variant : -1);
+        }
+
+        // Same slot and, for what is held in the hands, the same grip: what WhyNot lets share a look.
+        private static bool SameKind(ItemDrop.ItemData a, ItemDrop.ItemData b)
+        {
+            if (a == null || b == null || a.m_dropPrefab == null || a.m_shared == null || b.m_shared == null) return false;
+            ItemDrop.ItemData.ItemType type = a.m_shared.m_itemType;
+            if (type != b.m_shared.m_itemType || !HasLookSlot(type)) return false;
+            if (!IsHand(type)) return true;
+            return a.m_shared.m_animationState == b.m_shared.m_animationState
+                && a.m_shared.m_animationState != ItemDrop.ItemData.AnimationState.FishingRod;
         }
 
         private static string LookValue(string prefab, int variant)
