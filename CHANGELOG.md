@@ -4,6 +4,12 @@
 
 The version is set in one place — `GlamourPlugin.Version` in `src/GlamourPlugin.cs`.
 
+## 0.1.1
+
+- The Glamour button sits at the top of the screen, left of the minimap (`ButtonPlace`);
+  `ButtonPlace = Inventory` puts it back beside the inventory panel. `ButtonOffset` now moves
+  it from either place (default 0, 0).
+
 ## 0.1.0
 
 - First release. Armor, weapons and shields can look like another item of the same kind and

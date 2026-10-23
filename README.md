@@ -11,7 +11,8 @@ Version history is in `CHANGELOG.md`.
 
 ## How to use
 
-Open the inventory and press the **Glamour** button beside it. The window shows:
+Open the inventory and press the **Glamour** button at the top of the screen, left of the
+minimap (`ButtonPlace = Inventory` puts it beside the inventory panel). The window shows:
 
 - **at the top, your equipped items** — helmet, chest, legs, cape, belt, trinket and what is in
   your hands — each drawn in the look it wears; click one to choose it;
@@ -101,7 +102,8 @@ once.
 | 01 General | `Weapons` | `true` | weapons, shields, torches and tools can take a look |
 | 01 General | `Tooltip` | `true` | the tooltip says which look the item wears |
 | 02 Panel | `Looks` | `Found` | `Found`: items you have picked up or carry; `All`: every item of the kind |
-| 02 Panel | `ButtonOffset` | `8, 0` | the button's offset from the inventory panel's top right corner |
+| 02 Panel | `ButtonPlace` | `Minimap` | `Minimap`: at the top of the screen, left of the minimap; `Inventory`: beside the inventory panel's top right corner |
+| 02 Panel | `ButtonOffset` | `0, 0` | moves the button from that place, in pixels |
 | 02 Panel | `PanelOffset` | `0, 0` | where the window opens; dragging the window sets it |
 | 02 Panel | `ApplyToAllOfKind` | `false` | on: a look chosen for an item goes onto every item of the same kind you carry (same slot; held items also the same grip) — own look and *Hidden* too |
 

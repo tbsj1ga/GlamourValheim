@@ -27,7 +27,7 @@ namespace Glamour
     {
         public const string Guid = "j1ga.glamour";
         public const string Name = "Glamour";
-        public const string Version = "0.1.0";
+        public const string Version = "0.1.1";
 
         // ItemData.m_customData key: "<prefab>" or "<prefab>|<variant>" for the look, "-" for hidden.
         private const string DataKey = "j1ga.glamour";

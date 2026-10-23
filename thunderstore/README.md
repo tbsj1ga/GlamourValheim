@@ -10,7 +10,7 @@ check: install it if you want it; your friends, the host and a dedicated server 
 
 ## How to use
 
-Open the inventory and press **Glamour** beside it. At the top of the window are your equipped
+Open the inventory and press **Glamour** at the top of the screen, left of the minimap. At the top of the window are your equipped
 items, each in the look it wears; pick one, then click any look below — *Own look*, *Hidden*
 (helmet, cape, belt, trinket) or any item of the same kind you have found. Your character
 wears it at once. Drag the window wherever you like; it remembers the spot.
@@ -33,7 +33,8 @@ wears it at once. Drag the window wherever you like; it remembers the spot.
 - `Weapons` — looks for weapons, shields, torches and tools.
 - `Tooltip` — the look line in the tooltip.
 - `Looks` — `Found` (items you have picked up) or `All`.
-- `ButtonOffset`, `PanelOffset` — where the button and the window sit.
+- `ButtonPlace` — the button left of the minimap or beside the inventory panel.
+- `ButtonOffset`, `PanelOffset` — fine-tune where the button and the window sit.
 - `ApplyToAllOfKind` (off by default) — a look goes onto every item of the same kind you carry.
 
 Works with HudLayout: the button and the window can be moved in its editor.

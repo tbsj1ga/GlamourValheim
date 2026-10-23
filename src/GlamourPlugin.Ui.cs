@@ -26,8 +26,10 @@ namespace Glamour
         // hides with the inventory.
         // ------------------------------------------------------------------
         public enum LookSource { Found, All }
+        public enum ButtonPlace { Minimap, Inventory }
 
         private static ConfigEntry<LookSource> _cfgLooks;
+        private static ConfigEntry<ButtonPlace> _cfgButtonPlace;
         private static ConfigEntry<Vector2> _cfgButtonOffset;
         private static ConfigEntry<Vector2> _cfgPanelOffset;
         private static ConfigEntry<bool> _cfgAllOfKind;
@@ -69,15 +71,18 @@ namespace Glamour
         {
             _cfgLooks = Config.Bind("02 Panel", "Looks", LookSource.Found,
                 "Found: the looks of items you have picked up at least once (or carry). All: every item of the kind in the game.");
-            _cfgButtonOffset = Config.Bind("02 Panel", "ButtonOffset", new Vector2(8f, 0f),
-                "Where the Glamour button sits: offset from the top right corner of the inventory panel.");
+            _cfgButtonPlace = Config.Bind("02 Panel", "ButtonPlace", ButtonPlace.Minimap,
+                "Where the Glamour button sits while the inventory is open. Minimap: at the top of the screen, left of the minimap. Inventory: beside the inventory panel's top right corner.");
+            _cfgButtonOffset = Config.Bind("02 Panel", "ButtonOffset", new Vector2(0f, 0f),
+                "Moves the Glamour button from that place, in pixels (x right, y up).");
             _cfgPanelOffset = Config.Bind("02 Panel", "PanelOffset", new Vector2(0f, 0f),
                 "Where the window opens, relative to its place beside the inventory. Dragging the window sets it.");
             _cfgAllOfKind = Config.Bind("02 Panel", "ApplyToAllOfKind", false,
                 "On: a look chosen for an item goes onto every item of the same kind you carry (the same slot; weapons, shields, torches and tools also the same grip). Own look and Hidden too.");
             _cfgLooks.SettingChanged += delegate { if (_instance != null) _instance.RebuildLooks(); };
             _cfgAllOfKind.SettingChanged += delegate { if (_instance != null) _instance.RebuildLooks(); };
-            _cfgButtonOffset.SettingChanged += delegate { if (_instance != null && _instance._button != null) _instance._button.anchoredPosition = _cfgButtonOffset.Value; };
+            _cfgButtonOffset.SettingChanged += delegate { if (_instance != null) _instance.PlaceButton(); };
+            _cfgButtonPlace.SettingChanged += delegate { if (_instance != null) _instance.PlaceButton(); };
         }
 
         private void DestroyUi()
@@ -357,11 +362,9 @@ namespace Glamour
             float size = elementRect != null && elementRect.rect.width > 1f ? elementRect.rect.width : 64f;
             _cell = size + 6f;
 
-            // The button on the inventory panel
-            _button = MakeButton(gui, gui.m_player, "Glamour", TogglePanel);
-            _button.anchorMin = _button.anchorMax = new Vector2(1f, 1f);
-            _button.pivot = new Vector2(0f, 1f);
-            _button.anchoredPosition = _cfgButtonOffset.Value;
+            // The button: left of the minimap or on the inventory panel (PlaceButton)
+            _button = MakeButton(gui, gui.m_inventoryRoot, "Glamour", TogglePanel);
+            PlaceButton();
 
             // The window
             float width = Pad * 2f + GridColumns * _cell;
@@ -426,6 +429,42 @@ namespace Glamour
             return true;
         }
 
+        // Left of the minimap, its top level with the minimap's top (where the minimap is when
+        // the button is made, HudLayout's place included); or on the inventory panel. Under the
+        // inventory's root either way, so it shows and hides with the inventory. Without a
+        // minimap (turned off on the server) it goes to the screen's top right corner.
+        private void PlaceButton()
+        {
+            if (_button == null || _uiGui == null) return;
+            if (_cfgButtonPlace.Value == ButtonPlace.Inventory)
+            {
+                _button.SetParent(_uiGui.m_player, false);
+                _button.anchorMin = _button.anchorMax = new Vector2(1f, 1f);
+                _button.pivot = new Vector2(0f, 1f);
+                _button.anchoredPosition = new Vector2(8f, 0f) + _cfgButtonOffset.Value;
+                return;
+            }
+            RectTransform root = _uiGui.m_inventoryRoot as RectTransform;
+            if (root == null) return;
+            _button.SetParent(root, false);
+            _button.anchorMin = _button.anchorMax = new Vector2(0.5f, 0.5f);
+            _button.pivot = new Vector2(1f, 1f);
+            RectTransform map = Minimap.instance != null && Minimap.instance.m_smallRoot != null
+                ? Minimap.instance.m_smallRoot.transform as RectTransform : null;
+            Vector2 topRight;
+            if (map != null && map.gameObject.activeInHierarchy)
+            {
+                Vector3[] corners = new Vector3[4];
+                map.GetWorldCorners(corners);
+                topRight = (Vector2)root.InverseTransformPoint(corners[1]) + new Vector2(-12f, 0f);
+            }
+            else
+            {
+                topRight = new Vector2(root.rect.xMax - 12f, root.rect.yMax - 12f);
+            }
+            _button.anchoredPosition = topRight - root.rect.center + _cfgButtonOffset.Value;
+        }
+
         // Beside the inventory panel's top right corner, plus where it was dragged to.
         private void PlacePanel()
         {
@@ -435,8 +474,10 @@ namespace Glamour
             Vector3[] corners = new Vector3[4];
             _uiGui.m_player.GetWorldCorners(corners);
             Vector2 local = root.InverseTransformPoint(corners[2]);
-            float buttonW = _button != null ? _button.rect.width : 0f;
-            _panel.anchoredPosition = local - root.rect.center + new Vector2(_cfgButtonOffset.Value.x + buttonW + 8f, 0f) + _cfgPanelOffset.Value;
+            // the button on the panel's corner pushes the window past it
+            float shift = 8f;
+            if (_cfgButtonPlace.Value == ButtonPlace.Inventory && _button != null) shift += 8f + _cfgButtonOffset.Value.x + _button.rect.width;
+            _panel.anchoredPosition = local - root.rect.center + new Vector2(shift, 0f) + _cfgPanelOffset.Value;
         }
 
         private void SetGridHeight(int rows)
